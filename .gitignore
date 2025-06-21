@@ -1,0 +1,41 @@
+# Build and output directories
+build/
+out/
+.vs/
+
+# vcpkg build artifacts
+vcpkg_installed/
+vcpkg/
+
+# CMake generated files
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+Makefile
+
+# Compiled object files and binaries
+*.o
+*.obj
+*.exe
+*.dll
+*.lib
+*.so
+*.a
+*.out
+*.log
+
+# User-specific files
+*.user
+*.suo
+*.VC.db
+*.VC.opendb
+
+# Backup and temporary files
+*~
+*.tmp
+*.bak
+*.swp
+*.DS_Store
+
+# Ignore vcpkg binary if checked out with executable
+/vcpkg
