@@ -90,7 +90,8 @@ int main(int argc, char** argv)
             const auto start = Clock::now();
             if (event->type == qx::EventType::Snapshot) {
                 book.applySnapshot(*event);
-            } else if (book.applyDelta(*event) == qx::ApplyStatus::Applied) {
+            } else {
+                book.applyDelta(*event);
             }
             ++applied;
             applyHistogram.observe(static_cast<double>(

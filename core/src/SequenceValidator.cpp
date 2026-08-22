@@ -80,30 +80,68 @@ SequenceValidator::Result SequenceValidator::validate(const MarketEvent& event)
         return result;
     }
 
-    case Mode::Sequenced: {
+    case Mode::OkxSequenced: {
+        // A snapshot always establishes a fresh baseline. Real OKX snapshots
+        // carry prevSeqId = -1 ("no predecessor"); anything else is malformed
+        // snapshot metadata and must not be trusted as a baseline.
         if (event.type == EventType::Snapshot) {
-            lastSequence_ = event.sequence;
+            if (!event.prevSequence.has_value() || *event.prevSequence != -1) {
+                result.verdict = Verdict::GapResync;
+                result.effectiveSequence
+                    = lastSeqId_ > 0 ? static_cast<std::uint64_t>(lastSeqId_) : 0;
+                ++stats_.gapResyncs;
+                return result;
+            }
+            hasBaseline_ = true;
+            lastSeqId_ = static_cast<std::int64_t>(event.sequence);
             result.verdict = Verdict::Accept;
             result.effectiveSequence = event.sequence;
             ++stats_.accepted;
             return result;
         }
 
-        if (event.sequence <= lastSequence_) {
-            result.verdict = Verdict::StaleReject;
-            result.effectiveSequence = lastSequence_;
-            ++stats_.staleRejected;
+        // Deltas before a snapshot cannot be anchored to any book state.
+        // This is expected churn right after subscribing, not a feed
+        // discontinuity: drop without counting a gap.
+        if (!hasBaseline_) {
+            result.verdict = Verdict::GapResync;
+            result.effectiveSequence = 0;
             return result;
         }
 
-        if (event.sequence > lastSequence_ + 1) {
+        // Without prevSeqId metadata continuity is unverifiable: reject and
+        // resynchronize rather than guess.
+        if (!event.prevSequence.has_value()) {
             result.verdict = Verdict::GapResync;
-            result.effectiveSequence = lastSequence_;
+            result.effectiveSequence = static_cast<std::uint64_t>(lastSeqId_);
             ++stats_.gapResyncs;
             return result;
         }
 
-        lastSequence_ = event.sequence;
+        const std::int64_t prevSeqId = *event.prevSequence;
+
+        // The single real-OKX continuity rule: the message must connect to
+        // the previously accepted seqId. seqId itself may jump forward,
+        // repeat (no-change keepalive) or move lower (maintenance reset).
+        if (prevSeqId != lastSeqId_) {
+            result.verdict = Verdict::GapResync;
+            result.effectiveSequence = static_cast<std::uint64_t>(lastSeqId_);
+            ++stats_.gapResyncs;
+            return result;
+        }
+
+        // A repeated seqId is only valid in the no-change keepalive form
+        // (empty asks and bids). A repeated seqId carrying levels would
+        // double-apply those levels.
+        if (static_cast<std::int64_t>(event.sequence) == lastSeqId_
+            && !(event.bids.empty() && event.asks.empty())) {
+            result.verdict = Verdict::StaleReject;
+            result.effectiveSequence = static_cast<std::uint64_t>(lastSeqId_);
+            ++stats_.staleRejected;
+            return result;
+        }
+
+        lastSeqId_ = static_cast<std::int64_t>(event.sequence);
         result.verdict = Verdict::Accept;
         result.effectiveSequence = event.sequence;
         ++stats_.accepted;
@@ -114,25 +152,39 @@ SequenceValidator::Result SequenceValidator::validate(const MarketEvent& event)
     return result;
 }
 
-bool SequenceValidator::verifyChecksum(const Book& book, const MarketEvent& applied)
+SequenceValidator::ChecksumVerdict SequenceValidator::verifyChecksum(const Book& book,
+    const MarketEvent& applied,
+    IntegrityPolicy policy)
 {
+    switch (policy) {
+    case IntegrityPolicy::SequenceOnly:
+        // Current OKX books channels deprecated the checksum field on
+        // 2026-06-23; it remains present but is fixed to 0. Never treat that
+        // as verification data - continuity comes from seqId/prevSeqId.
+        return ChecksumVerdict::NotPresent;
+
+    case IntegrityPolicy::SequenceAndChecksum:
+        break;
+    }
+
     if (!applied.checksum.has_value()) {
-        return true;
+        return ChecksumVerdict::NotPresent;
     }
 
     const std::int32_t expected = computeTopOfBookChecksum(book);
     if (expected == static_cast<std::int32_t>(*applied.checksum)) {
-        return true;
+        return ChecksumVerdict::Pass;
     }
 
     ++stats_.checksumFailures;
-    return false;
+    return ChecksumVerdict::Mismatch;
 }
 
 void SequenceValidator::reset()
 {
     stats_ = Stats {};
-    lastSequence_ = 0;
+    hasBaseline_ = false;
+    lastSeqId_ = -1;
     arrivalCounter_ = 0;
 }
 

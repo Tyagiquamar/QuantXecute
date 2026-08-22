@@ -1,4 +1,4 @@
-{"type":"snapshot","sequence":1000,"timestamp_ns":1755850000000000000,"bids":[{"price":"63000.5","size":"1.20"},{"price":"62999.0","size":"0.75"},{"price":"62998.25","size":"2.40"}],"asks":[{"price":"63001.0","size":"0.90"},{"price":"63002.5","size":"1.50"},{"price":"63004.0","size":"0.60"}]}
-{"type":"delta","sequence":1001,"timestamp_ns":1755850000100000000,"bids":[{"price":"63000.9","size":"0.35"}],"asks":[]}
-{"type":"delta","sequence":1002,"timestamp_ns":1755850000200000000,"bids":[{"price":"62999.0","size":"0.85"}],"asks":[{"price":"63002.5","size":"0"}]}
-{"type":"delta","sequence":1003,"timestamp_ns":1755850000300000000,"bids":[{"price":"62998.25","size":"0"}],"asks":[{"price":"63005.5","size":"0.70"}]}
+{"type":"snapshot","seqId":10,"prevSeqId":-1,"timestamp_ns":1755850000000000000,"bids":[{"price":"63000.5","size":"1.20"},{"price":"62999.0","size":"0.75"},{"price":"62998.25","size":"2.40"}],"asks":[{"price":"63001.0","size":"0.90"},{"price":"63002.5","size":"1.50"},{"price":"63004.0","size":"0.60"}]}
+{"type":"delta","seqId":15,"prevSeqId":10,"timestamp_ns":1755850000100000000,"bids":[{"price":"63000.9","size":"0.35"}],"asks":[]}
+{"type":"delta","seqId":15,"prevSeqId":15,"timestamp_ns":1755850000200000000,"bids":[],"asks":[]}
+{"type":"delta","seqId":19,"prevSeqId":15,"timestamp_ns":1755850000300000000,"bids":[{"price":"62999.0","size":"0.85"}],"asks":[{"price":"63002.5","size":"0"},{"price":"63005.5","size":"0.70"},{"price":"62998.25","size":"0"}]}

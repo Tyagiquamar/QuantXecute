@@ -67,7 +67,7 @@ TEST_CASE("deltas insert update and delete price levels")
         qx::MarketEvent delta;
         delta.sequence = 2;
         delta.bids = levels({ { 63000.9, 0.35 } });
-        CHECK(book.applyDelta(delta) == qx::ApplyStatus::Applied);
+        book.applyDelta(delta);
 
         const auto bids = book.bids();
         REQUIRE(bids.size() == 3);
@@ -82,7 +82,7 @@ TEST_CASE("deltas insert update and delete price levels")
         qx::MarketEvent delta;
         delta.sequence = 2;
         delta.bids = levels({ { 62999.0, 0.85 } });
-        CHECK(book.applyDelta(delta) == qx::ApplyStatus::Applied);
+        book.applyDelta(delta);
 
         const auto bids = book.bids();
         REQUIRE(bids.size() == 2);
@@ -95,7 +95,7 @@ TEST_CASE("deltas insert update and delete price levels")
         qx::MarketEvent delta;
         delta.sequence = 2;
         delta.asks = levels({ { 63001.0, 0.0 } });
-        CHECK(book.applyDelta(delta) == qx::ApplyStatus::Applied);
+        book.applyDelta(delta);
 
         CHECK(book.asks().empty());
         CHECK_FALSE(book.bestAsk().has_value());
@@ -146,40 +146,58 @@ TEST_CASE("deleting a non-existent level is a no-op")
     delta.sequence = 2;
     delta.bids = levels({ { 42.0, 0.0 } });
     delta.asks = levels({ { 43.0, 0.0 } });
-    CHECK(book.applyDelta(delta) == qx::ApplyStatus::Applied);
+    book.applyDelta(delta);
 
     CHECK(book.bids().size() == 1);
     CHECK(book.asks().size() == 1);
     CHECK(book.lastSequence() == 2);
 }
 
-TEST_CASE("stale and gapped deltas are rejected without state change")
+TEST_CASE("validator-rejected updates never touch book state")
 {
+    // The Book is a pure applier; continuity decisions belong to the
+    // SequenceValidator. This proves the combined contract: whatever the
+    // validator refuses, the book never sees.
     qx::Book book;
+    qx::SequenceValidator validator;
 
-    qx::MarketEvent snap;
-    snap.type = qx::EventType::Snapshot;
-    snap.sequence = 10;
-    snap.bids = levels({ { 100.0, 1.0 } });
-    snap.asks = levels({ { 101.0, 1.0 } });
-    book.applySnapshot(snap);
+    auto snap = levels({ { 100.0, 1.0 } });
+    qx::MarketEvent snapshotEvent;
+    snapshotEvent.type = qx::EventType::Snapshot;
+    snapshotEvent.sequence = 10;
+    snapshotEvent.hasSequence = true;
+    snapshotEvent.prevSequence = -1;
+    snapshotEvent.bids = snap;
+    snapshotEvent.asks = levels({ { 101.0, 1.0 } });
+    book.applySnapshot(snapshotEvent);
+    REQUIRE(validator.validate(snapshotEvent).verdict
+        == qx::SequenceValidator::Verdict::Accept);
 
-    qx::MarketEvent stale;
-    stale.sequence = 10;
-    stale.bids = levels({ { 99.0, 5.0 } });
-    CHECK(book.applyDelta(stale) == qx::ApplyStatus::StaleRejected);
+    const std::string before = book.serialize();
 
-    qx::MarketEvent older;
-    older.sequence = 4;
-    older.bids = levels({ { 98.0, 5.0 } });
-    CHECK(book.applyDelta(older) == qx::ApplyStatus::StaleRejected);
+    SUBCASE("stale duplicate with levels")
+    {
+        qx::MarketEvent stale;
+        stale.sequence = 10;
+        stale.hasSequence = true;
+        stale.prevSequence = 9;
+        stale.bids = levels({ { 99.0, 5.0 } });
+        CHECK(validator.validate(stale).verdict == qx::SequenceValidator::Verdict::StaleReject);
+        CHECK(book.serialize() == before);
+    }
 
-    qx::MarketEvent gap;
-    gap.sequence = 13;
-    gap.bids = levels({ { 97.0, 5.0 } });
-    CHECK(book.applyDelta(gap) == qx::ApplyStatus::GapRejected);
+    SUBCASE("prevSeqId mismatch (gap)")
+    {
+        qx::MarketEvent gap;
+        gap.sequence = 13;
+        gap.hasSequence = true;
+        gap.prevSequence = 11;
+        gap.bids = levels({ { 97.0, 5.0 } });
+        CHECK(validator.validate(gap).verdict == qx::SequenceValidator::Verdict::GapResync);
+        CHECK(book.serialize() == before);
+        CHECK(book.lastSequence() == 10);
+    }
 
-    CHECK(book.lastSequence() == 10);
     REQUIRE(book.bestBid().has_value());
     CHECK(book.bestBid()->price == 100.0);
 }
@@ -199,7 +217,7 @@ TEST_CASE("crossed book detection")
     qx::MarketEvent crossDelta;
     crossDelta.sequence = 2;
     crossDelta.bids = levels({ { 101.25, 1.0 } });
-    CHECK(book.applyDelta(crossDelta) == qx::ApplyStatus::Applied);
+    book.applyDelta(crossDelta);
     CHECK(book.isCrossed());
 
     SUBCASE("fixture reproduces crossed book")
@@ -209,7 +227,7 @@ TEST_CASE("crossed book detection")
             if (event.type == qx::EventType::Snapshot) {
                 fixtureBook.applySnapshot(event);
             } else {
-                CHECK(fixtureBook.applyDelta(event) == qx::ApplyStatus::Applied);
+                fixtureBook.applyDelta(event);
             }
         }
         CHECK(fixtureBook.isCrossed());

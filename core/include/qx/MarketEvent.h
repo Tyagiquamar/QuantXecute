@@ -16,7 +16,16 @@ enum class EventType : std::uint8_t {
 
 struct MarketEvent {
     EventType type = EventType::Delta;
+
+    // Feed sequence id carried by the transport (OKX seqId). Absent metadata
+    // means the feed provides no usable sequencing (Arrival mode).
     std::uint64_t sequence = 0;
+    bool hasSequence = false;
+
+    // Previous sequence id (OKX prevSeqId). Signed because OKX snapshots use
+    // the sentinel -1 ("no predecessor"); never store it in an unsigned type.
+    std::optional<std::int64_t> prevSequence;
+
     std::int64_t timestampNs = 0;
 
     std::vector<Level> bids;
@@ -28,6 +37,7 @@ struct MarketEvent {
 constexpr bool operator==(const MarketEvent& lhs, const MarketEvent& rhs) noexcept
 {
     if (lhs.type != rhs.type || lhs.sequence != rhs.sequence
+        || lhs.hasSequence != rhs.hasSequence || lhs.prevSequence != rhs.prevSequence
         || lhs.timestampNs != rhs.timestampNs || lhs.checksum != rhs.checksum
         || lhs.bids.size() != rhs.bids.size() || lhs.asks.size() != rhs.asks.size()) {
         return false;

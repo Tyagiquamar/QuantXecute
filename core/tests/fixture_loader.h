@@ -31,8 +31,20 @@ inline std::vector<MarketEvent> loadEventsJsonl(const std::string& path)
 
         MarketEvent event;
         event.type = j.at("type").get<std::string>() == "snapshot" ? EventType::Snapshot : EventType::Delta;
-        event.sequence = j.at("sequence").get<std::uint64_t>();
-        event.timestampNs = j.at("timestamp_ns").get<std::int64_t>();
+
+        if (auto it = j.find("seqId"); it != j.end() && it->is_number_unsigned()) {
+            event.sequence = it->get<std::uint64_t>();
+            event.hasSequence = true;
+            if (auto prev = j.find("prevSeqId"); prev != j.end() && prev->is_number_integer()) {
+                event.prevSequence = prev->get<std::int64_t>();
+            }
+        } else {
+            // Legacy dense-sequence fixtures without OKX metadata.
+            event.sequence = j.at("sequence").get<std::uint64_t>();
+            event.hasSequence = true;
+        }
+
+        event.timestampNs = j.value("timestamp_ns", static_cast<std::int64_t>(0));
 
         for (const auto& side : { "bids", "asks" }) {
             auto& levels = side[0] == 'b' ? event.bids : event.asks;

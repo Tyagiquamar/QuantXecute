@@ -11,6 +11,7 @@ ReplayStats replayInto(Book& book, const std::string& logPath, const ReplayOptio
 {
     ReplayStats stats;
     EventLogReader reader(logPath);
+    SequenceValidator validator(options.validatorMode);
 
     std::int64_t previousTimestampNs = 0;
 
@@ -29,17 +30,31 @@ ReplayStats replayInto(Book& book, const std::string& logPath, const ReplayOptio
         }
         previousTimestampNs = event->timestampNs;
 
-        switch (event->type) {
-        case EventType::Snapshot:
-            book.applySnapshot(*event);
+        const auto verdict = validator.validate(*event);
+
+        switch (verdict.verdict) {
+        case SequenceValidator::Verdict::Accept:
+            switch (event->type) {
+            case EventType::Snapshot:
+                book.applySnapshot(*event);
+                break;
+            case EventType::Delta:
+                book.applyDelta(*event);
+                break;
+            }
             ++stats.eventsApplied;
             break;
-        case EventType::Delta:
-            if (book.applyDelta(*event) == ApplyStatus::Applied) {
-                ++stats.eventsApplied;
-            } else {
-                ++stats.staleRejected;
-            }
+
+        case SequenceValidator::Verdict::StaleReject:
+            ++stats.staleRejected;
+            break;
+
+        case SequenceValidator::Verdict::GapResync:
+            // Mirror the live pipeline: a continuity failure invalidates the
+            // book until the next recorded snapshot re-establishes it.
+            book.clear();
+            validator.reset();
+            ++stats.gapResyncs;
             break;
         }
     }

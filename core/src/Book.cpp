@@ -1,31 +1,8 @@
 #include "qx/Book.h"
 
 #include <charconv>
-#include <cmath>
 
 namespace qx {
-
-void Book::applyLevels(Book::BidMap& side, const std::vector<Level>& levels)
-{
-    for (const auto& level : levels) {
-        if (level.size == 0.0) {
-            side.erase(level.price);
-        } else {
-            side[level.price] = level.size;
-        }
-    }
-}
-
-void Book::applyLevels(Book::AskMap& side, const std::vector<Level>& levels)
-{
-    for (const auto& level : levels) {
-        if (level.size == 0.0) {
-            side.erase(level.price);
-        } else {
-            side[level.price] = level.size;
-        }
-    }
-}
 
 void Book::applySnapshot(const MarketEvent& snapshot)
 {
@@ -34,36 +11,19 @@ void Book::applySnapshot(const MarketEvent& snapshot)
     bids_.clear();
     asks_.clear();
 
-    for (const auto& level : snapshot.bids) {
-        if (level.size != 0.0 && !std::isnan(level.price)) {
-            bids_[level.price] = level.size;
-        }
-    }
-    for (const auto& level : snapshot.asks) {
-        if (level.size != 0.0 && !std::isnan(level.price)) {
-            asks_[level.price] = level.size;
-        }
-    }
+    applyLevels(bids_, snapshot.bids);
+    applyLevels(asks_, snapshot.asks);
 
     lastSequence_ = snapshot.sequence;
 }
 
-ApplyStatus Book::applyDelta(const MarketEvent& delta)
+void Book::applyDelta(const MarketEvent& delta)
 {
     const std::lock_guard<std::mutex> lock(mutex_);
-
-    if (delta.sequence <= lastSequence_) {
-        return ApplyStatus::StaleRejected;
-    }
-    if (delta.sequence > lastSequence_ + 1) {
-        return ApplyStatus::GapRejected;
-    }
 
     applyLevels(bids_, delta.bids);
     applyLevels(asks_, delta.asks);
     lastSequence_ = delta.sequence;
-
-    return ApplyStatus::Applied;
 }
 
 namespace {

@@ -77,7 +77,8 @@ TEST_CASE("engine counters track exactly one increment per event")
                 (void)book.applyDelta(event);
                 ++counters.deltasApplied;
             }
-            if (!validator.verifyChecksum(book, event)) {
+            if (validator.verifyChecksum(book, event, qx::IntegrityPolicy::SequenceOnly)
+                    == qx::SequenceValidator::ChecksumVerdict::Mismatch) {
                 ++counters.checksumFailures;
             }
             break;

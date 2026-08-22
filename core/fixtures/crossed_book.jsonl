@@ -1,2 +1,2 @@
-{"type":"snapshot","sequence":2000,"timestamp_ns":1755850010000000000,"bids":[{"price":"100.0","size":"5.00"},{"price":"99.5","size":"3.00"}],"asks":[{"price":"100.5","size":"4.00"},{"price":"101.0","size":"2.50"}]}
-{"type":"delta","sequence":2001,"timestamp_ns":1755850010100000000,"bids":[{"price":"101.25","size":"1.00"}],"asks":[]}
+{"type":"snapshot","seqId":2000,"prevSeqId":-1,"timestamp_ns":1755850010000000000,"bids":[{"price":"100.0","size":"5.00"},{"price":"99.5","size":"3.00"}],"asks":[{"price":"100.5","size":"4.00"},{"price":"101.0","size":"2.50"}]}
+{"type":"delta","seqId":2001,"prevSeqId":2000,"timestamp_ns":1755850010100000000,"bids":[{"price":"101.25","size":"1.00"}],"asks":[]}

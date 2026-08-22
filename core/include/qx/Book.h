@@ -12,19 +12,18 @@
 
 namespace qx {
 
-enum class ApplyStatus : std::uint8_t {
-    Applied,
-    StaleRejected,
-    GapRejected,
-};
-
+// The Book is a pure state applier: it never judges continuity. Feed-specific
+// sequencing rules live in SequenceValidator, and an event reaches this class
+// only after that validator accepted it. This keeps OKX-valid updates (forward
+// seqId jumps, no-change keepalives, maintenance resets) from being rejected
+// here by stale generic assumptions.
 class Book {
 public:
     Book() = default;
 
     void applySnapshot(const MarketEvent& snapshot);
 
-    ApplyStatus applyDelta(const MarketEvent& delta);
+    void applyDelta(const MarketEvent& delta);
 
     std::vector<Level> bids() const;
     std::vector<Level> asks() const;
@@ -45,8 +44,17 @@ private:
     using BidMap = std::map<double, double, std::greater<double>>;
     using AskMap = std::map<double, double, std::less<double>>;
 
-    static void applyLevels(BidMap& side, const std::vector<Level>& levels);
-    static void applyLevels(AskMap& side, const std::vector<Level>& levels);
+    template <typename Map>
+    static void applyLevels(Map& side, const std::vector<Level>& levels)
+    {
+        for (const auto& level : levels) {
+            if (level.size == 0.0) {
+                side.erase(level.price);
+            } else {
+                side[level.price] = level.size;
+            }
+        }
+    }
 
     mutable std::mutex mutex_;
     BidMap bids_;

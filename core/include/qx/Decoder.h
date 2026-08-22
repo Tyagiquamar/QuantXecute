@@ -7,7 +7,12 @@
 namespace qx {
 
 enum class FeedFormat : std::uint8_t {
+    // Real OKX v5 order-book framing: action snapshot/update, data[0] carrying
+    // seqId/prevSeqId sequencing metadata.
     OkxBooks,
+
+    // Generic proxy framing without transport sequencing guarantees; pair with
+    // SequenceValidator::Mode::Arrival (documented weaker integrity).
     ProxyBooks,
 };
 

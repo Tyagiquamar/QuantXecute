@@ -2,6 +2,7 @@
 
 #include <charconv>
 #include <chrono>
+#include <stdexcept>
 
 #include <nlohmann/json.hpp>
 
@@ -80,8 +81,19 @@ bool Recorder::record(const MarketEvent& event)
 
     line += "{\"type\":\"";
     line += event.type == EventType::Snapshot ? "snapshot" : "delta";
-    line += "\",\"sequence\":";
+    line += "\",\"seqId\":";
     appendInt(line, event.sequence);
+
+    // Persist the exact feed sequencing metadata so replay reproduces the
+    // same validation decisions. prevSeqId keeps its signed -1 snapshot form.
+    if (event.prevSequence.has_value()) {
+        line += ",\"prevSeqId\":";
+        appendInt(line, *event.prevSequence);
+    }
+    if (!event.hasSequence) {
+        line += ",\"sequenced\":false";
+    }
+
     line += ",\"timestamp_ns\":";
     appendInt(line, event.timestampNs);
     line += ",\"captured_at_ns\":";
@@ -120,7 +132,7 @@ std::optional<MarketEvent> EventLogReader::next()
 
     std::string line;
     while (std::getline(in_, line)) {
-        if (line.empty()) {
+        if (line.empty() || line.front() == '#') {
             continue;
         }
 
@@ -135,7 +147,36 @@ std::optional<MarketEvent> EventLogReader::next()
             }
             event.type = typeIt->get<std::string>() == "snapshot" ? EventType::Snapshot : EventType::Delta;
 
-            event.sequence = parsed.at("sequence").get<std::uint64_t>();
+            // Sequenced logs carry seqId/prevSeqId. Legacy logs with only a
+            // dense "sequence" field are still readable, but their events
+            // lack prevSeqId metadata and therefore cannot pass strict
+            // continuity validation.
+            bool sequenced = true;
+            if (auto it = parsed.find("sequenced"); it != parsed.end()
+                && it->is_boolean()) {
+                sequenced = it->get<bool>();
+            }
+
+            if (auto it = parsed.find("seqId"); it != parsed.end()
+                && it->is_number_unsigned()) {
+                event.sequence = it->get<std::uint64_t>();
+                event.hasSequence = true;
+            } else if (auto legacy = parsed.find("sequence");
+                       legacy != parsed.end() && legacy->is_number_unsigned()) {
+                event.sequence = legacy->get<std::uint64_t>();
+                event.hasSequence = true;
+            } else {
+                sequenced = false;
+            }
+
+            if (!sequenced) {
+                event.sequence = 0;
+                event.hasSequence = false;
+            } else if (auto it = parsed.find("prevSeqId");
+                       it != parsed.end() && it->is_number_integer()) {
+                event.prevSequence = it->get<std::int64_t>();
+            }
+
             event.timestampNs = parsed.value("timestamp_ns", static_cast<std::int64_t>(0));
 
             for (const char* side : { "bids", "asks" }) {
@@ -145,8 +186,8 @@ std::optional<MarketEvent> EventLogReader::next()
                     throw std::runtime_error("missing side");
                 }
                 for (const auto& entry : *sideIt) {
-                    const auto price = std::stod(entry.at("price").get<std::string>());
-                    const auto size = std::stod(entry.at("size").get<std::string>());
+                    const auto price = entry.at("price").get<double>();
+                    const auto size = entry.at("size").get<double>();
                     levels.push_back(Level { price, size });
                 }
             }
@@ -166,4 +207,4 @@ std::optional<MarketEvent> EventLogReader::next()
     return std::nullopt;
 }
 
-} // namespace qx
+}

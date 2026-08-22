@@ -62,7 +62,8 @@ TEST_CASE("large timestamps and negative checksums round-trip exactly")
 
     qx::MarketEvent event;
     event.type = qx::EventType::Snapshot;
-    event.sequence = 18446744073709551615ull;
+    // seqId domain is the signed int64 range; UINT64_MAX is not a legal id.
+    event.sequence = 9223372036854775807ull;
     event.timestampNs = 1755850000123456789LL;
     event.checksum = -180370240;
     event.bids = { { 63000.5, 1.20 } };
