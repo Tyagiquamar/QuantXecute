@@ -18,7 +18,15 @@ namespace qx::feed {
 
 struct FeedConfig {
     qx::FeedFormat format = qx::FeedFormat::OkxBooks;
-    qx::SequenceValidator::Mode validatorMode = qx::SequenceValidator::Mode::Sequenced;
+
+    // Continuity semantics owned by SequenceValidator.
+    qx::SequenceValidator::Mode validatorMode = qx::SequenceValidator::Mode::OkxSequenced;
+
+    // Which integrity guarantees this feed actually provides. Current OKX
+    // books channels use SequenceOnly: their deprecated checksum field is
+    // fixed to 0 and must never be verified.
+    qx::IntegrityPolicy integrityPolicy = qx::IntegrityPolicy::SequenceOnly;
+
     std::chrono::milliseconds stalenessThreshold { 5000 };
     ReconnectPolicy reconnectPolicy = ReconnectPolicy::defaults();
 };
@@ -61,7 +69,12 @@ public:
 
     BookView book() const;
     bool isBookReady() const;
+
+    // Simulates against the current accepted book. When the pipeline is not
+    // ready (no snapshot yet, or invalidated by a gap/checksum failure) the
+    // result reports insufficientLiquidity instead of pretending health.
     ExecutionResult simulate(const OrderRequest& request) const;
+
     FeedHealth health() const;
 
 private:
@@ -75,6 +88,7 @@ private:
     void handleFrame(std::string_view payload);
     void handleState(ConnectionState state);
     void resetPipelineLocked();
+    void invalidateBookLocked();
 
     FeedSource& source_;
     FeedConfig config_;
