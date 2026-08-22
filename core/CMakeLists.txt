@@ -24,6 +24,7 @@ endif()
 
 # Sanitizer verification instruments production sources too: see
 # cmake/Sanitizers.cmake for why this is required for honest ASan/UBSan/TSan.
+include(Warnings)
 include(Sanitizers)
 qx_apply_warnings(quantxecute_core)
 qx_apply_sanitizers(quantxecute_core)
