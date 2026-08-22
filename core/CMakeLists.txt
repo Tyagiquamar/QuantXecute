@@ -1,8 +1,20 @@
-add_library(quantxecute_core INTERFACE)
+set(QX_CORE_SRC
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/Book.cpp)
+
+add_library(quantxecute_core STATIC ${QX_CORE_SRC})
 add_library(qx::core ALIAS quantxecute_core)
 
-target_include_directories(quantxecute_core INTERFACE
-    ${CMAKE_CURRENT_SOURCE_DIR}/include
-    ${PROJECT_SOURCE_DIR}/third_party)
+target_include_directories(quantxecute_core
+    PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
 
-target_compile_features(quantxecute_core INTERFACE cxx_std_20)
+target_compile_features(quantxecute_core PUBLIC cxx_std_20)
+
+find_package(nlohmann_json QUIET)
+if(nlohmann_json_FOUND)
+    target_link_libraries(quantxecute_core PUBLIC nlohmann_json::nlohmann_json)
+else()
+    target_include_directories(quantxecute_core SYSTEM PUBLIC ${PROJECT_SOURCE_DIR}/third_party)
+endif()
+
+include(Warnings)
+qx_apply_warnings(quantxecute_core)
