@@ -1,5 +1,6 @@
 #pragma once
 
+#include <array>
 #include <cstddef>
 #include <cstdint>
 
@@ -9,6 +10,9 @@ enum class Side : std::uint8_t {
     Buy,
     Sell,
 };
+
+inline constexpr std::size_t kDepthBandCount = 4;
+inline constexpr std::array<double, kDepthBandCount> kDepthBandsBps { 5.0, 10.0, 25.0, 50.0 };
 
 struct ExecutionResult {
     Side side = Side::Buy;
@@ -34,6 +38,9 @@ struct ExecutionResult {
     double totalCostBps = 0.0;
     double totalCostUsd = 0.0;
 
+    std::array<double, kDepthBandCount> bidDepthNotionalWithinBps {};
+    std::array<double, kDepthBandCount> askDepthNotionalWithinBps {};
+
     std::size_t levelsConsumed = 0;
     bool insufficientLiquidity = false;
 };
@@ -55,6 +62,8 @@ constexpr bool operator==(const ExecutionResult& lhs, const ExecutionResult& rhs
         && lhs.feeUsd == rhs.feeUsd
         && lhs.totalCostBps == rhs.totalCostBps
         && lhs.totalCostUsd == rhs.totalCostUsd
+        && lhs.bidDepthNotionalWithinBps == rhs.bidDepthNotionalWithinBps
+        && lhs.askDepthNotionalWithinBps == rhs.askDepthNotionalWithinBps
         && lhs.levelsConsumed == rhs.levelsConsumed
         && lhs.insufficientLiquidity == rhs.insufficientLiquidity;
 }
