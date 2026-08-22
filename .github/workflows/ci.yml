@@ -1,0 +1,133 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - "**/*.md"
+      - "docs/**"
+      - "LICENSE"
+  pull_request:
+    branches: [main]
+    paths-ignore:
+      - "**/*.md"
+      - "docs/**"
+      - "LICENSE"
+  workflow_dispatch:
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # ASan + UBSan over production core/feed sources and the full test suite.
+  # ---------------------------------------------------------------------------
+  cpp-sanitizers:
+    name: C++ ASan+UBSan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: make verify-fast (ASan+UBSan build, full ctest)
+        run: make verify-fast
+
+  # ---------------------------------------------------------------------------
+  # ThreadSanitizer over the suite. TSan requires a permissive seccomp profile;
+  # scoped to this container run only.
+  # ---------------------------------------------------------------------------
+  cpp-tsan:
+    name: C++ TSan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: make verify-tsan (full ThreadSanitizer pass)
+        run: make verify-tsan
+
+  # ---------------------------------------------------------------------------
+  # clang-tidy over actual production sources; warnings fail the job.
+  # ---------------------------------------------------------------------------
+  clang-tidy:
+    name: clang-tidy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: make verify-tidy
+        run: make verify-tidy
+
+  # ---------------------------------------------------------------------------
+  # Dashboard: unit tests, typecheck, production build.
+  # No lockfile is committed; npm install keeps the dependency set from
+  # package.json. Switching to npm ci is intentional once a lockfile lands.
+  # ---------------------------------------------------------------------------
+  dashboard:
+    name: dashboard tests/typecheck/build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: dashboard
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: install
+        run: npm install
+      - name: unit tests
+        run: npm test
+      - name: typecheck
+        run: npx tsc --noEmit
+      - name: build
+        run: npm run build
+
+  # ---------------------------------------------------------------------------
+  # Docker: engine image builds, compose config is valid, and the replay demo
+  # actually serves a non-empty book plus a working /simulate. This guards the
+  # "compose serves an empty engine" regression class.
+  # ---------------------------------------------------------------------------
+  docker:
+    name: docker build + replay smoke
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: build engine image
+        run: docker build -f server/Dockerfile -t qx-engine .
+      - name: validate compose file
+        run: docker compose config > /dev/null
+      - name: boot replay container and smoke test
+        run: |
+          docker compose up -d --build
+          trap 'docker compose down' EXIT
+
+          ready=0
+          for i in $(seq 1 60); do
+            if curl -fsS http://localhost:8080/health >/dev/null 2>&1; then
+              ready=1
+              break
+            fi
+            sleep 2
+          done
+          if [ "$ready" != "1" ]; then
+            echo "engine did not become healthy"; exit 1
+          fi
+
+          echo "--- /health ---"
+          curl -fsS http://localhost:8080/health
+
+          echo "--- /book ---"
+          BOOK=$(curl -fsS http://localhost:8080/book)
+          echo "$BOOK"
+          echo "$BOOK" | python3 -c '
+            import json, sys
+            book = json.load(sys.stdin)
+            assert book["sequence"] > 0, f"empty sequence: {book}"
+            assert len(book["bids"]) > 0, "no bids"
+            assert len(book["asks"]) > 0, "no asks"
+          '
+
+          echo "--- POST /simulate ---"
+          SIM=$(curl -fsS -X POST http://localhost:8080/simulate \
+            -H "Content-Type: application/json" \
+            -d '{"side":"buy","mode":"notional","size":25000,"feeBps":5}')
+          echo "$SIM"
+          echo "$SIM" | python3 -c '
+            import json, sys
+            result = json.load(sys.stdin)
+            assert result["filledBaseQty"] > 0, "simulation filled nothing"
+            assert result["totalCostBps"] >= 0, "nonsensical cost"
+          '
