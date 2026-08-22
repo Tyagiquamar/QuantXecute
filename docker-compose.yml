@@ -5,5 +5,15 @@ services:
       dockerfile: server/Dockerfile
     ports:
       - "8080:8080"
-    command: ["--bind", "0.0.0.0", "--port", "8080"]
+    environment:
+      QX_MODE: "replay"
+      QX_LOG: "/engine/fixtures/btc_snapshot_deltas.jsonl"
+      QX_ALLOWED_ORIGINS: ""
+    command:
+      [
+        "--mode", "replay",
+        "--log", "/engine/fixtures/btc_snapshot_deltas.jsonl",
+        "--bind", "0.0.0.0",
+        "--port", "8080"
+      ]
     restart: unless-stopped
