@@ -1,51 +1,63 @@
 cmake_minimum_required(VERSION 3.21)
-project(TradeSimulator)
 
-# Use modern C++
+project(QuantXecute
+    VERSION 0.2.0
+    DESCRIPTION "Real-time market-data and execution-simulation engine"
+    LANGUAGES CXX)
+
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-# Set vcpkg triplet (optional but recommended)
-set(VCPKG_TARGET_TRIPLET "x64-linux" CACHE STRING "Vcpkg target triplet")
+list(PREPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 
-# Use vcpkg toolchain file for dependency management
-if(NOT DEFINED CMAKE_TOOLCHAIN_FILE)
-    set(CMAKE_TOOLCHAIN_FILE "${CMAKE_SOURCE_DIR}/vcpkg/scripts/buildsystems/vcpkg.cmake"
-        CACHE STRING "Vcpkg toolchain file")
+option(QX_BUILD_TESTS "Build the QuantXecute test suite" ON)
+option(QX_BUILD_CONSOLE "Build the legacy ImGui desktop console (needs glfw/opengl/imgui/ixwebsocket)" OFF)
+option(QX_WERROR "Treat compiler warnings as errors" ON)
+option(QX_SANITIZE_ADDRESS "Enable AddressSanitizer" OFF)
+option(QX_SANITIZE_UNDEFINED "Enable UndefinedBehaviorSanitizer" OFF)
+option(QX_SANITIZE_THREAD "Enable ThreadSanitizer" OFF)
+
+add_subdirectory(core)
+
+if(QX_BUILD_TESTS)
+    enable_testing()
+    add_subdirectory(core/tests)
 endif()
 
-# Find required packages
-find_package(glfw3 CONFIG REQUIRED)
-            # Use 'glfw' not 'glfw3'
-find_package(OpenGL REQUIRED)
-find_package(nlohmann_json CONFIG REQUIRED)
-find_package(ixwebsocket CONFIG REQUIRED)
-find_package(imgui CONFIG REQUIRED)
+if(QX_BUILD_CONSOLE)
+    find_package(glfw3 CONFIG REQUIRED)
+    find_package(OpenGL REQUIRED)
+    find_package(nlohmann_json CONFIG REQUIRED)
+    find_package(ixwebsocket CONFIG REQUIRED)
 
-# Source files
-file(GLOB_RECURSE MODEL_SRC src/models/*.cpp)
-file(GLOB_RECURSE UI_SRC src/ui/*.cpp)
-file(GLOB_RECURSE BACKEND_SRC src/ui/backends/*.cpp)
-set(SRC_FILES src/main.cpp ${MODEL_SRC} ${UI_SRC} ${BACKEND_SRC})
+    set(QX_CONSOLE_SRC
+        src/main.cpp
+        src/models/SimulationModel.cpp
+        src/models/WebSocketClient.cpp
+        src/ui/imgui.cpp
+        src/ui/imgui_draw.cpp
+        src/ui/imgui_tables.cpp
+        src/ui/imgui_widgets.cpp
+        src/ui/InputPanel.cpp
+        src/ui/OutputPanel.cpp
+        src/ui/backend/imgui_impl_glfw.cpp
+        src/ui/backend/imgui_impl_opengl3.cpp)
 
-# Add executable
-add_executable(TradeSimulator ${SRC_FILES})
+    add_executable(TradeSimulator ${QX_CONSOLE_SRC})
 
-# Link libraries
-target_link_libraries(TradeSimulator PRIVATE 
-    glfw
-    OpenGL::GL
-    nlohmann_json::nlohmann_json
-    ixwebsocket::ixwebsocket
-    imgui::imgui
-)
+    target_include_directories(TradeSimulator PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/ui
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/ui/backend)
 
-# Include directories
-target_include_directories(TradeSimulator PRIVATE
-    ${CMAKE_SOURCE_DIR}/include
-    ${CMAKE_SOURCE_DIR}/src/ui
-    ${CMAKE_SOURCE_DIR}/src/ui/backend
-)
+    target_link_libraries(TradeSimulator PRIVATE
+        quantxecute_core
+        glfw
+        OpenGL::GL
+        nlohmann_json::nlohmann_json
+        ixwebsocket::ixwebsocket)
 
-# Optional: Show source groups in Visual Studio
-source_group(TREE ${CMAKE_SOURCE_DIR}/src FILES ${SRC_FILES})
+    qx_apply_warnings(TradeSimulator)
+endif()

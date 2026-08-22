@@ -1,5 +1,6 @@
 # Build and output directories
 build/
+build-verify/
 out/
 .vs/
 
@@ -11,7 +12,8 @@ vcpkg/
 CMakeFiles/
 CMakeCache.txt
 cmake_install.cmake
-Makefile
+build*/CMakeFiles/
+build*/CMakeCache.txt
 
 # Compiled object files and binaries
 *.o
