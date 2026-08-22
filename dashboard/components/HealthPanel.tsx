@@ -28,6 +28,10 @@ export default function HealthPanel({ health }: { health: HealthState | null }) 
       </div>
 
       <Stat label="connected" value={String(health.connected)} />
+      <Stat label="integrity mode" value="seqId/prevSeqId (OKX checksum deprecated)" />
+      {typeof health.lastSeqId === 'number' ? (
+        <Stat label="last seqId" value={String(health.lastSeqId)} />
+      ) : null}
       <Stat label="messages accepted" value={String(health.messagesAccepted)} />
       <Stat label="reconnects" value={String(health.reconnects)} />
       <Stat label="sequence gaps" value={String(health.sequenceGaps)} />

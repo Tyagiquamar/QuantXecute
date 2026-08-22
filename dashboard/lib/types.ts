@@ -15,6 +15,11 @@ export interface BookState {
 }
 
 export interface HealthState {
+  mode?: string;
+  exchange?: string;
+  instrument?: string;
+  channel?: string;
+
   connected: boolean;
   bookReady: boolean;
   stale: boolean;
@@ -24,6 +29,7 @@ export interface HealthState {
   staleRejected: number;
   checksumFailures: number;
   messagesAccepted: number;
+  lastSeqId?: number;
   lastMessageAgeMs: number;
 }
 
@@ -48,8 +54,12 @@ export interface ExecutionResult {
 }
 
 export interface EngineEvent {
+  mode?: string;
+  exchange?: string;
+  instrument?: string;
   mid?: number;
   spreadBps?: number;
   sequence: number;
+  bookReady?: boolean;
   health: HealthState;
 }
