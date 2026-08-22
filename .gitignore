@@ -1,8 +1,16 @@
 # Build and output directories
 build/
 build-verify/
+build-tsan/
+build-tidy/
+build-bench/
 out/
 .vs/
+node_modules/
+.next/
+
+# Dashboard
+dashboard/next-env.d.ts
 
 # vcpkg build artifacts
 vcpkg_installed/

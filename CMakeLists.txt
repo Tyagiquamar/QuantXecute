@@ -13,6 +13,8 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 list(PREPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 
 option(QX_BUILD_TESTS "Build the QuantXecute test suite" ON)
+option(QX_BUILD_BENCH "Build the benchmark suite" OFF)
+option(QX_BUILD_SERVER "Build the engine HTTP/WebSocket server (POSIX only)" ON)
 option(QX_BUILD_CONSOLE "Build the legacy ImGui desktop console (needs glfw/opengl/imgui/ixwebsocket)" OFF)
 option(QX_WERROR "Treat compiler warnings as errors" ON)
 option(QX_SANITIZE_ADDRESS "Enable AddressSanitizer" OFF)
@@ -26,6 +28,12 @@ if(QX_BUILD_TESTS)
     add_subdirectory(core/tests)
 endif()
 
+add_subdirectory(feed)
+
+if(QX_BUILD_SERVER AND UNIX)
+    add_subdirectory(server)
+endif()
+
 if(QX_BUILD_CONSOLE)
     find_package(glfw3 CONFIG REQUIRED)
     find_package(OpenGL REQUIRED)
@@ -33,24 +41,24 @@ if(QX_BUILD_CONSOLE)
     find_package(ixwebsocket CONFIG REQUIRED)
 
     set(QX_CONSOLE_SRC
-        src/main.cpp
-        src/models/SimulationModel.cpp
-        src/models/WebSocketClient.cpp
-        src/ui/imgui.cpp
-        src/ui/imgui_draw.cpp
-        src/ui/imgui_tables.cpp
-        src/ui/imgui_widgets.cpp
-        src/ui/InputPanel.cpp
-        src/ui/OutputPanel.cpp
-        src/ui/backend/imgui_impl_glfw.cpp
-        src/ui/backend/imgui_impl_opengl3.cpp)
+        console/src/main.cpp
+        console/src/models/SimulationModel.cpp
+        console/src/models/WebSocketClient.cpp
+        console/ui/imgui.cpp
+        console/ui/imgui_draw.cpp
+        console/ui/imgui_tables.cpp
+        console/ui/imgui_widgets.cpp
+        console/ui/InputPanel.cpp
+        console/ui/OutputPanel.cpp
+        console/ui/backend/imgui_impl_glfw.cpp
+        console/ui/backend/imgui_impl_opengl3.cpp)
 
     add_executable(TradeSimulator ${QX_CONSOLE_SRC})
 
     target_include_directories(TradeSimulator PRIVATE
-        ${CMAKE_CURRENT_SOURCE_DIR}/include
-        ${CMAKE_CURRENT_SOURCE_DIR}/src/ui
-        ${CMAKE_CURRENT_SOURCE_DIR}/src/ui/backend)
+        ${CMAKE_CURRENT_SOURCE_DIR}/console/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/console/ui
+        ${CMAKE_CURRENT_SOURCE_DIR}/console/ui/backend)
 
     target_link_libraries(TradeSimulator PRIVATE
         quantxecute_core
