@@ -22,7 +22,7 @@ struct MarketEvent {
     std::vector<Level> bids;
     std::vector<Level> asks;
 
-    std::optional<std::uint32_t> checksum;
+    std::optional<std::int64_t> checksum;
 };
 
 constexpr bool operator==(const MarketEvent& lhs, const MarketEvent& rhs) noexcept

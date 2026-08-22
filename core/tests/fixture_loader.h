@@ -44,7 +44,7 @@ inline std::vector<MarketEvent> loadEventsJsonl(const std::string& path)
         }
 
         if (j.contains("checksum")) {
-            event.checksum = j.at("checksum").get<std::uint32_t>();
+            event.checksum = j.at("checksum").get<std::int64_t>();
         }
 
         events.push_back(std::move(event));

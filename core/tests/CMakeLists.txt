@@ -16,3 +16,5 @@ endfunction()
 
 qx_add_test(types_test SRC types_test.cpp)
 qx_add_test(book_test SRC book_test.cpp)
+qx_add_test(decoder_test SRC decoder_test.cpp)
+qx_add_test(sequence_test SRC sequence_test.cpp)
