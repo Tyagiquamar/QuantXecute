@@ -22,8 +22,11 @@ else()
     target_include_directories(quantxecute_core SYSTEM PUBLIC ${PROJECT_SOURCE_DIR}/third_party)
 endif()
 
-include(Warnings)
+# Sanitizer verification instruments production sources too: see
+# cmake/Sanitizers.cmake for why this is required for honest ASan/UBSan/TSan.
+include(Sanitizers)
 qx_apply_warnings(quantxecute_core)
+qx_apply_sanitizers(quantxecute_core)
 
 if(QX_BUILD_BENCH)
     add_subdirectory(bench)
