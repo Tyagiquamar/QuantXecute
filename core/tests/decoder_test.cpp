@@ -249,7 +249,7 @@ TEST_CASE("timestamps are milliseconds converted to nanoseconds with overflow ch
     {
         // One ms above INT64_MAX/1e6: multiplying would overflow int64 ns.
         const std::string payload = R"({"action":"update","data":[{
-            "seqId":2,"prevSeqId":1,"bids":[],"asks":[],"ts":9223372036854}]})";
+            "seqId":2,"prevSeqId":1,"bids":[],"asks":[],"ts":9223372036855}]})";
         CHECK(qx::decodeFrame(payload, qx::FeedFormat::OkxBooks).status
             == qx::DecodeStatus::Malformed);
     }

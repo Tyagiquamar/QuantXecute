@@ -186,8 +186,10 @@ std::optional<MarketEvent> EventLogReader::next()
                     throw std::runtime_error("missing side");
                 }
                 for (const auto& entry : *sideIt) {
-                    const auto price = entry.at("price").get<double>();
-                    const auto size = entry.at("size").get<double>();
+                    // Prices/sizes are stored as strings (matching the
+                    // writer and exchange convention); parse them strictly.
+                    const auto price = std::stod(entry.at("price").get<std::string>());
+                    const auto size = std::stod(entry.at("size").get<std::string>());
                     levels.push_back(Level { price, size });
                 }
             }

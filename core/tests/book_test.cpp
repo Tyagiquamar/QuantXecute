@@ -178,10 +178,12 @@ TEST_CASE("validator-rejected updates never touch book state")
 
     SUBCASE("stale duplicate with levels")
     {
+        // Same seqId repeated with payload is the only stale form: prevSeqId
+        // connects, but the id was already applied.
         qx::MarketEvent stale;
         stale.sequence = 10;
         stale.hasSequence = true;
-        stale.prevSequence = 9;
+        stale.prevSequence = 10;
         stale.bids = levels({ { 99.0, 5.0 } });
         CHECK(validator.validate(stale).verdict == qx::SequenceValidator::Verdict::StaleReject);
         CHECK(book.serialize() == before);

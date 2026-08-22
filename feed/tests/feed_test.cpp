@@ -128,9 +128,9 @@ TEST_CASE("forward seqId jumps flow through the whole pipeline without false gap
     CHECK(client.health().messagesAccepted == 3);
     CHECK(source.resubscribeCalls == resubscribesAfterStart);
     REQUIRE_FALSE(client.book().empty());
-    REQUIRE(client.book().bestBid().has_value());
-    CHECK(client.book().bestBid()->price == doctest::Approx(100.5));
-    CHECK(client.book().bestBid()->size == doctest::Approx(1.0));
+    REQUIRE_FALSE(client.book().bidLevels.empty());
+    CHECK(client.book().bidLevels.front().price == doctest::Approx(100.5));
+    CHECK(client.book().bidLevels.front().size == doctest::Approx(1.0));
 }
 
 TEST_CASE("no-change keepalive refreshes liveness, leaves the book untouched")
