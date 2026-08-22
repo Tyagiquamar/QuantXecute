@@ -32,7 +32,7 @@ TEST_CASE("recorder round-trips events identically")
     REQUIRE(original.size() == 4);
 
     const auto path = tempLogPath("qx_recorder_roundtrip.jsonl");
-    std::filesystem::remove(path);
+    { std::error_code ec; std::filesystem::remove(path, ec); }
 
     {
         qx::Recorder recorder(path);
@@ -52,13 +52,13 @@ TEST_CASE("recorder round-trips events identically")
     CHECK(reader.malformedLines() == 0);
     CHECK(reader.eof());
 
-    std::filesystem::remove(path);
+    { std::error_code ec; std::filesystem::remove(path, ec); }
 }
 
 TEST_CASE("large timestamps and negative checksums round-trip exactly")
 {
     const auto path = tempLogPath("qx_recorder_precision.jsonl");
-    std::filesystem::remove(path);
+    { std::error_code ec; std::filesystem::remove(path, ec); }
 
     qx::MarketEvent event;
     event.type = qx::EventType::Snapshot;
@@ -80,7 +80,7 @@ TEST_CASE("large timestamps and negative checksums round-trip exactly")
     REQUIRE(restored.size() == 1);
     CHECK(restored[0] == event);
 
-    std::filesystem::remove(path);
+    { std::error_code ec; std::filesystem::remove(path, ec); }
 }
 
 TEST_CASE("truncated final line is skipped and reported, not fatal")
@@ -102,7 +102,7 @@ TEST_CASE("truncated final line is skipped and reported, not fatal")
     CHECK(reader.malformedLines() == 1);
     CHECK(reader.eof());
 
-    std::filesystem::remove(path);
+    { std::error_code ec; std::filesystem::remove(path, ec); }
 }
 
 TEST_CASE("missing file yields empty stream without crash")

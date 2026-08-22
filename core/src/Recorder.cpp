@@ -157,24 +157,28 @@ std::optional<MarketEvent> EventLogReader::next()
                 sequenced = it->get<bool>();
             }
 
+            // The raw id is preserved even for unsequenced logs so recorded
+            // events round-trip byte-identically; only the hasSequence flag
+            // reflects whether the transport guarantees sequencing.
+            bool haveSeq = false;
             if (auto it = parsed.find("seqId"); it != parsed.end()
                 && it->is_number_unsigned()) {
                 event.sequence = it->get<std::uint64_t>();
-                event.hasSequence = true;
+                haveSeq = true;
             } else if (auto legacy = parsed.find("sequence");
                        legacy != parsed.end() && legacy->is_number_unsigned()) {
                 event.sequence = legacy->get<std::uint64_t>();
-                event.hasSequence = true;
-            } else {
-                sequenced = false;
+                haveSeq = true;
             }
 
-            if (!sequenced) {
+            event.hasSequence = haveSeq && sequenced;
+            if (!haveSeq) {
                 event.sequence = 0;
-                event.hasSequence = false;
-            } else if (auto it = parsed.find("prevSeqId");
-                       it != parsed.end() && it->is_number_integer()) {
-                event.prevSequence = it->get<std::int64_t>();
+            } else if (sequenced) {
+                if (auto it = parsed.find("prevSeqId");
+                    it != parsed.end() && it->is_number_integer()) {
+                    event.prevSequence = it->get<std::int64_t>();
+                }
             }
 
             event.timestampNs = parsed.value("timestamp_ns", static_cast<std::int64_t>(0));

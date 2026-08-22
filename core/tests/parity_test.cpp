@@ -125,7 +125,7 @@ TEST_CASE("parity invariant on the BTC fixture: identical books and executions")
 
     checkParity(liveBook, replayBook);
 
-    std::filesystem::remove(logPath);
+    { std::error_code ec; std::filesystem::remove(logPath, ec); }
 }
 
 TEST_CASE("parity invariant on the real-shape OKX chain: jumps, keepalive, maintenance reset")
@@ -155,7 +155,7 @@ TEST_CASE("parity invariant on the real-shape OKX chain: jumps, keepalive, maint
 
     checkParity(liveBook, replayBook);
 
-    std::filesystem::remove(logPath);
+    { std::error_code ec; std::filesystem::remove(logPath, ec); }
 }
 
 TEST_CASE("replay speed multiplier changes pacing only, never the outcome")
@@ -180,7 +180,7 @@ TEST_CASE("replay speed multiplier changes pacing only, never the outcome")
         CHECK(pacedBook.serialize() == referenceSerialize);
     }
 
-    std::filesystem::remove(logPath);
+    { std::error_code ec; std::filesystem::remove(logPath, ec); }
 }
 
 TEST_CASE("corrupted replay breaks parity - the guard guards")
@@ -206,7 +206,7 @@ TEST_CASE("corrupted replay breaks parity - the guard guards")
 
         CHECK_FALSE(liveBook.serialize() == replayBook.serialize());
 
-        std::filesystem::remove(logPath);
+        { std::error_code ec; std::filesystem::remove(logPath, ec); }
     }
 
     SUBCASE("a tampered prevSeqId breaks continuity and clears the replay book")
@@ -227,7 +227,7 @@ TEST_CASE("corrupted replay breaks parity - the guard guards")
 
         CHECK_FALSE(liveBook.serialize() == replayBook.serialize());
 
-        std::filesystem::remove(logPath);
+        { std::error_code ec; std::filesystem::remove(logPath, ec); }
     }
 
     SUBCASE("divergence is visible in execution results too")
@@ -252,6 +252,6 @@ TEST_CASE("corrupted replay breaks parity - the guard guards")
         }
         CHECK_FALSE(allIdentical);
 
-        std::filesystem::remove(logPath);
+        { std::error_code ec; std::filesystem::remove(logPath, ec); }
     }
 }
