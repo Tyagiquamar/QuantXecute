@@ -152,6 +152,11 @@ SequenceValidator::Result SequenceValidator::validate(const MarketEvent& event)
     return result;
 }
 
+bool SequenceValidator::hasBaseline() const
+{
+    return hasBaseline_;
+}
+
 SequenceValidator::ChecksumVerdict SequenceValidator::verifyChecksum(const Book& book,
     const MarketEvent& applied,
     IntegrityPolicy policy)

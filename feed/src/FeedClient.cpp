@@ -138,6 +138,16 @@ void FeedClient::resetPipelineLocked()
     validator_.reset();
 }
 
+void FeedClient::invalidateBookLocked()
+{
+    // A continuity or integrity failure must leave no usable book behind and
+    // force a snapshot-only recovery: the cleared validator accepts further
+    // deltas only after a fresh snapshot re-anchors it.
+    book_.clear();
+    validator_.reset();
+    health_.bookReady = false;
+}
+
 void FeedClient::handleFrame(const std::string_view payload)
 {
     bool resubscribeRequested = false;
@@ -155,10 +165,13 @@ void FeedClient::handleFrame(const std::string_view payload)
 
         MarketEvent event = decoded.event;
 
-        const auto verdict = validator_.validate(event);
+        bool accepted = false;
 
+        const auto verdict = validator_.validate(event);
         switch (verdict.verdict) {
         case SequenceValidator::Verdict::Accept:
+            event.sequence = verdict.effectiveSequence;
+            accepted = true;
             break;
 
         case SequenceValidator::Verdict::StaleReject:
@@ -166,29 +179,40 @@ void FeedClient::handleFrame(const std::string_view payload)
             return;
 
         case SequenceValidator::Verdict::GapResync:
-            ++health_.sequenceGaps;
-            resetPipelineLocked();
-            resubscribeRequested = true;
+            // While waiting for an anchoring snapshot (no baseline yet) this
+            // is expected churn, not a discontinuity: drop silently without
+            // spamming resubscribes.
+            if (validator_.hasBaseline()) {
+                ++health_.sequenceGaps;
+                resubscribeRequested = true;
+            }
+            invalidateBookLocked();
             break;
         }
 
-        if (!resubscribeRequested) {
-            event.sequence = verdict.effectiveSequence;
-
+        if (accepted) {
             if (event.type == EventType::Snapshot) {
                 book_.applySnapshot(event);
             } else {
-                (void)book_.applyDelta(event);
-            }
-
-            if (!validator_.verifyChecksum(book_, event)) {
-                ++health_.checksumFailures;
+                book_.applyDelta(event);
             }
 
             lastMessageNs_ = now;
             health_.stale = false;
             health_.bookReady = true;
             ++health_.messagesAccepted;
+
+            const auto checksumVerdict = validator_.verifyChecksum(
+                book_, event, config_.integrityPolicy);
+            if (checksumVerdict == SequenceValidator::ChecksumVerdict::Mismatch) {
+                // verifyChecksum already counted the failure internally; this
+                // mirrors it into the public health counters. The book cannot
+                // be trusted after an unverifiable update: invalidate it and
+                // let a fresh snapshot rebuild known-good state.
+                ++health_.checksumFailures;
+                resubscribeRequested = true;
+                invalidateBookLocked();
+            }
         }
     }
 
@@ -218,6 +242,14 @@ ExecutionResult FeedClient::simulate(const OrderRequest& request) const
 {
     const std::lock_guard lock(mutex_);
     const ExecutionSimulator simulator;
+
+    if (!health_.bookReady) {
+        ExecutionResult unavailable;
+        unavailable.side = request.side;
+        unavailable.insufficientLiquidity = true;
+        return unavailable;
+    }
+
     return simulator.execute(book_, request);
 }
 
@@ -229,7 +261,7 @@ FeedHealth FeedClient::health() const
     out.state = health_.state;
 
     if (phase_ == Phase::Connected && lastMessageNs_ != 0) {
-        out.lastMessageAgeMs = (clockNs_() - lastMessageNs_) / 1'000'000;
+        out.lastMessageAgeMs = (clockNs_() - lastMessageNs_) / 1000000;
     }
 
     return out;

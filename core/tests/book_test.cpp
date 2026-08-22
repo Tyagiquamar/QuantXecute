@@ -6,6 +6,7 @@
 
 #include "fixture_loader.h"
 #include "qx/Book.h"
+#include "qx/SequenceValidator.h"
 
 namespace {
 
