@@ -67,3 +67,21 @@ target_link_libraries(quantxecute-live-smoke PRIVATE
 
 qx_apply_warnings(quantxecute-live-smoke)
 qx_apply_sanitizers(quantxecute-live-smoke)
+
+if(QX_BUILD_TESTS)
+    include(TestHelpers)
+
+    set(QX_SERVER_TEST_SRC ${CMAKE_CURRENT_SOURCE_DIR}/tests/api_server_test.cpp)
+    add_executable(api_server_test ${QX_SERVER_TEST_SRC})
+    target_include_directories(api_server_test PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests)
+    target_link_libraries(api_server_test PRIVATE
+        quantxecute_feed_okx
+        Threads::Threads)
+    include(Warnings)
+    qx_apply_warnings(api_server_test)
+    include(Sanitizers)
+    qx_apply_sanitizers(api_server_test)
+    add_test(NAME qx.api_server_test COMMAND api_server_test)
+endif()

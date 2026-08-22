@@ -39,8 +39,11 @@ public:
 
     void attach(HttpServer& http);
 
-private:
+    // Pure function over engine state; public so the HTTP layer stays thin
+    // and the behavior is deterministically testable without sockets.
     HttpResponse handleRequest(const HttpRequest& request);
+
+private:
     void runEventStream(int fd);
     bool originAllowed(const std::string& origin) const;
     void applyCors(HttpResponse& response, const HttpRequest& request) const;
