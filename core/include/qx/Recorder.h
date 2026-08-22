@@ -11,7 +11,7 @@ namespace qx {
 
 class Recorder {
 public:
-    explicit Recorder(std::string path);
+    explicit Recorder(const std::string& path);
     ~Recorder();
 
     Recorder(const Recorder&) = delete;
@@ -28,7 +28,7 @@ private:
 
 class EventLogReader {
 public:
-    explicit EventLogReader(std::string path);
+    explicit EventLogReader(const std::string& path);
 
     std::optional<MarketEvent> next();
 

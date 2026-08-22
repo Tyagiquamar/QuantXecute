@@ -2,6 +2,7 @@ set(QX_CORE_SRC
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Book.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Decoder.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ExecutionSimulator.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/Metrics.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Recorder.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Replay.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/SequenceValidator.cpp)
@@ -23,3 +24,7 @@ endif()
 
 include(Warnings)
 qx_apply_warnings(quantxecute_core)
+
+if(QX_BUILD_BENCH)
+    add_subdirectory(bench)
+endif()

@@ -52,7 +52,7 @@ std::string levelsToJson(const std::vector<Level>& levels)
 
 } // namespace
 
-Recorder::Recorder(std::string path)
+Recorder::Recorder(const std::string& path)
     : out_(path, std::ios::app)
 {
 }
@@ -106,7 +106,7 @@ bool Recorder::record(const MarketEvent& event)
     return static_cast<bool>(out_);
 }
 
-EventLogReader::EventLogReader(std::string path)
+EventLogReader::EventLogReader(const std::string& path)
     : in_(path)
 {
 }
