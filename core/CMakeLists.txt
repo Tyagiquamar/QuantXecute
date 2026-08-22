@@ -2,6 +2,7 @@ set(QX_CORE_SRC
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Book.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Decoder.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ExecutionSimulator.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/Recorder.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/SequenceValidator.cpp)
 
 add_library(quantxecute_core STATIC ${QX_CORE_SRC})
