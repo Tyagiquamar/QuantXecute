@@ -7,6 +7,15 @@
 
 namespace qx::feed {
 
+// Thin wrapper so the ixwebsocket header stays out of our public header.
+// Lives at qx::feed namespace scope to match the forward declaration in
+// OkxWebSocketSource.h - an anonymous-namespace definition here would be a
+// DIFFERENT type and leave the header's handle_ permanently incomplete.
+class IxWebSocketHandle {
+public:
+    ix::WebSocket socket;
+};
+
 namespace {
 
 std::int64_t steadyNowNs()
@@ -15,12 +24,6 @@ std::int64_t steadyNowNs()
         std::chrono::steady_clock::now().time_since_epoch())
         .count();
 }
-
-// Thin wrapper so the ixwebsocket header stays out of our public header.
-class IxWebSocketHandle {
-public:
-    ix::WebSocket socket;
-};
 
 } // namespace
 

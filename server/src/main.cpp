@@ -152,7 +152,7 @@ int main(int argc, char** argv)
                 const auto bookView = client->book();
                 view.bids = bookView.bidLevels;
                 view.asks = bookView.askLevels;
-                view.lastSequence = bookView.lastSequence;
+                view.lastSequence = bookView.lastSequence();
                 view.health = client->health();
                 api.updateEngineState(view);
                 std::this_thread::sleep_for(std::chrono::milliseconds(100));

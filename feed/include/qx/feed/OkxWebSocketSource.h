@@ -35,9 +35,11 @@ public:
 
         // Application-level liveness. OKX drops connections silent for <30s;
         // we ping well below that and allow a bounded pong window.
-        std::chrono::milliseconds pingInterval { 20000 };
-        std::chrono::milliseconds pongTimeout { 10000 };
-        std::chrono::milliseconds livenessTick { 500 };
+        // Copy-initialization form: braced duration NSDMIs trip older GCC
+        // aggregate/default-argument handling, copy-init is universally safe.
+        std::chrono::milliseconds pingInterval = std::chrono::milliseconds(20000);
+        std::chrono::milliseconds pongTimeout = std::chrono::milliseconds(10000);
+        std::chrono::milliseconds livenessTick = std::chrono::milliseconds(500);
 
         // Optional explicit CA bundle for TLS verification. Empty means the
         // TLS backend default (system store on Linux).

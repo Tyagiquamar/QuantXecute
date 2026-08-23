@@ -2,6 +2,9 @@ QX_IMAGE ?= qx-buildtools
 
 DOCKER_RUN = docker run --rm -v "$(CURDIR)":/work -w /work $(QX_IMAGE)
 
+# TSan needs a permissive seccomp profile; docker flags must precede the image.
+TSAN_DOCKER_RUN = docker run --rm --security-opt seccomp=unconfined -v "$(CURDIR)":/work -w /work $(QX_IMAGE)
+
 .PHONY: help docker-image verify verify-fast verify-tsan verify-tidy bench clean
 
 help:
@@ -26,7 +29,7 @@ verify-fast: docker-image
 		cd build-verify && ctest --output-on-failure --timeout 120'
 
 verify-tsan: docker-image
-	$(DOCKER_RUN) --security-opt seccomp=unconfined bash -ec '\
+	$(TSAN_DOCKER_RUN) bash -ec '\
 		cmake -S . -B build-tsan -G Ninja -DCMAKE_BUILD_TYPE=Debug \
 			-DQX_BUILD_TESTS=ON \
 			-DQX_SANITIZE_THREAD=ON && \
