@@ -105,6 +105,30 @@ TEST_CASE("truncated final line is skipped and reported, not fatal")
     { std::error_code ec; std::filesystem::remove(path, ec); }
 }
 
+TEST_CASE("level values obey the strict whole-string law at the log boundary")
+{
+    const auto path = tempLogPath("qx_recorder_strict_levels.jsonl");
+    {
+        std::ofstream out(path);
+        // trailing junk, NaN, negative size, negative price: all malformed
+        out << R"({"type":"snapshot","sequence":1,"timestamp_ns":10,"bids":[{"price":"100.2abc","size":"1"}],"asks":[]})" << '\n';
+        out << R"({"type":"snapshot","sequence":1,"timestamp_ns":10,"bids":[],"asks":[{"price":"nan","size":"1"}]})" << '\n';
+        out << R"({"type":"snapshot","sequence":1,"timestamp_ns":10,"bids":[{"price":"100","size":"-1"}],"asks":[]})" << '\n';
+        out << R"({"type":"snapshot","sequence":1,"timestamp_ns":10,"bids":[{"price":"-100","size":"1"}],"asks":[]})" << '\n';
+        // a well-formed line still parses after the malformed ones
+        out << R"({"type":"snapshot","sequence":1,"timestamp_ns":10,"bids":[{"price":"100.5","size":"2.5"}],"asks":[]})" << '\n';
+    }
+
+    qx::EventLogReader reader(path);
+    const auto restored = readAll(reader);
+
+    REQUIRE(restored.size() == 1);
+    CHECK(restored[0].bids.size() == 1);
+    CHECK(reader.malformedLines() == 4);
+
+    { std::error_code ec; std::filesystem::remove(path, ec); }
+}
+
 TEST_CASE("missing file yields empty stream without crash")
 {
     qx::EventLogReader reader(tempLogPath("qx_does_not_exist_12345.jsonl"));

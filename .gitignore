@@ -1,5 +1,6 @@
 # Build and output directories
 build/
+build-local/
 build-verify/
 build-tsan/
 build-tidy/
@@ -48,4 +49,4 @@ build*/CMakeCache.txt
 *.DS_Store
 
 # Ignore vcpkg binary if checked out with executable
-/vcpkg
+/vcpkgbuild-local/

@@ -2,7 +2,9 @@
 
 #include <charconv>
 #include <chrono>
+#include <cmath>
 #include <stdexcept>
+#include <string_view>
 
 #include <nlohmann/json.hpp>
 
@@ -49,6 +51,22 @@ std::string levelsToJson(const std::vector<Level>& levels)
     }
     out += "]";
     return out;
+}
+
+// Same strict whole-string law as the live decoder boundary: a replayed log
+// must pass through identical parsing rules. Throws so the caller's catch
+// counts the line as malformed instead of admitting silent corruption.
+double parseStrictLevelValue(const std::string& text)
+{
+    double value = 0.0;
+    const char* first = text.data();
+    const char* last = text.data() + text.size();
+    const auto result = std::from_chars(first, last, value);
+    if (text.empty() || result.ec != std::errc {} || result.ptr != last
+        || !std::isfinite(value)) {
+        throw std::runtime_error("invalid level value");
+    }
+    return value;
 }
 
 } // namespace
@@ -192,8 +210,14 @@ std::optional<MarketEvent> EventLogReader::next()
                 for (const auto& entry : *sideIt) {
                     // Prices/sizes are stored as strings (matching the
                     // writer and exchange convention); parse them strictly.
-                    const auto price = std::stod(entry.at("price").get<std::string>());
-                    const auto size = std::stod(entry.at("size").get<std::string>());
+                    const auto price = parseStrictLevelValue(entry.at("price").get<std::string>());
+                    if (price <= 0.0) {
+                        throw std::runtime_error("invalid level price");
+                    }
+                    const auto size = parseStrictLevelValue(entry.at("size").get<std::string>());
+                    if (size < 0.0) {
+                        throw std::runtime_error("invalid level size");
+                    }
                     levels.push_back(Level { price, size });
                 }
             }
