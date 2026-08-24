@@ -14,8 +14,12 @@ COPY feed feed
 COPY server server
 COPY third_party third_party
 
+# Static libstdc++/libgcc: the gcc:bookworm image ships a newer GCC than the
+# debian:bookworm-slim runtime's libstdc++6; the engine binary must not
+# depend on GLIBCXX versions newer than the slim image provides.
 RUN cmake -S . -B build-server -G Ninja -DCMAKE_BUILD_TYPE=Release \
         -DQX_BUILD_TESTS=OFF -DQX_BUILD_BENCH=OFF -DQX_BUILD_CONSOLE=OFF \
+        -DCMAKE_EXE_LINKER_FLAGS="-static-libstdc++ -static-libgcc" \
     && cmake --build build-server --target quantxecute-server quantxecute-live-smoke
 
 # ---- runtime stage ---------------------------------------------------------

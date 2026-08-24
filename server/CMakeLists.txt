@@ -33,16 +33,34 @@ qx_apply_warnings(quantxecute_feed_okx)
 include(Sanitizers)
 qx_apply_sanitizers(quantxecute_feed_okx)
 
+# REST/WS surface as its own linkable unit so the engine executable AND
+# tests can both consume it without recompiling sources by hand.
+set(QX_SERVER_API_SRC
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/ApiServer.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/WebSocket.cpp)
+
+add_library(quantxecute_server_api STATIC ${QX_SERVER_API_SRC})
+add_library(qx::server_api ALIAS quantxecute_server_api)
+
+target_include_directories(quantxecute_server_api PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}/include)
+
+target_link_libraries(quantxecute_server_api PUBLIC qx::feed)
+
+include(Warnings)
+qx_apply_warnings(quantxecute_server_api)
+include(Sanitizers)
+qx_apply_sanitizers(quantxecute_server_api)
+
 add_executable(quantxecute-server
     ${CMAKE_CURRENT_SOURCE_DIR}/src/main.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/ApiServer.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/HttpServer.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/WebSocket.cpp)
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/HttpServer.cpp)
 
 target_include_directories(quantxecute-server PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/include)
 
 target_link_libraries(quantxecute-server PRIVATE
+    quantxecute_server_api
     quantxecute_feed
     quantxecute_feed_okx)
 
@@ -77,6 +95,7 @@ if(QX_BUILD_TESTS)
         ${CMAKE_CURRENT_SOURCE_DIR}/include
         ${CMAKE_CURRENT_SOURCE_DIR}/tests)
     target_link_libraries(api_server_test PRIVATE
+        quantxecute_server_api
         quantxecute_feed_okx
         Threads::Threads)
     include(Warnings)

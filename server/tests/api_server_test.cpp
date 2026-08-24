@@ -73,8 +73,10 @@ TEST_CASE("valid /simulate executes against the served book")
     qx::server::ApiServer api;
     primeReplayBook(api);
 
+    // Ask depth here is 100.5 x 4 + 101.0 x 2 = 604 quote notional; 500
+    // forces the simulator to walk BOTH ask levels.
     const auto result = bodyAsJson(api.handleRequest({ "POST", "/simulate",
-        R"({"side":"buy","mode":"notional","size":25000,"feeBps":5})", {} }));
+        R"({"side":"buy","mode":"notional","size":500,"feeBps":5})", {} }));
 
     CHECK(result["side"] == "buy");
     CHECK(result["filledBaseQty"] > 0.0);
