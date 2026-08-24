@@ -23,6 +23,12 @@ namespace qx::feed {
 //
 // Reconnect/backoff/staleness policy stays in FeedClient: this source never
 // re-connects on its own, it only reports ConnectionState transitions.
+//
+// Physical connection lifecycle: one worker session spans connect() until the
+// transport reaches its terminal event (Close/Error) or disconnect() is
+// requested. After a terminal event the worker retires itself, so a later
+// connect() (FeedClient backoff expiry) establishes a fresh physical
+// connection instead of being swallowed by the idempotent guard.
 class OkxWebSocketSource final : public FeedSource {
 public:
     struct Config {
@@ -76,16 +82,45 @@ private:
 
     Config config_;
 
+    // -------------------------------------------------------------------------
+    // Synchronization model (audited):
+    //
+    //   mutex_-owned (every access holds mutex_; no exceptions):
+    //     handle_           physical IXWebSocket instance (null off-session)
+    //     workerRunning_    worker thread exists / session slot occupied
+    //     stopRequested_    disconnect() requested
+    //     connected_        transport-level Open seen, no terminal event yet
+    //     sessionTerminal_  transport delivered Close/Error for this session
+    //     closeRequested_   internal stop requested (upgrade notice)
+    //     pingOutstanding_  application-level ping awaiting "pong"
+    //
+    //   atomic (lock-free simple access only):
+    //     lastActivityNs_   written from IXWebSocket callback threads
+    //     upgradeNotices_ / errorEvents_ / missedPongs_
+    //
+    // Threading contract: IXWebSocket invokes the message callback on its own
+    // background thread; the liveness loop runs on worker_; resubscribe() is
+    // driven by the owning FeedClient host thread. Callbacks mutate
+    // mutex_-owned state only - they never block on the socket while holding
+    // mutex_ and never call emitState()/emitFrame() under the lock (handlers
+    // may re-enter resubscribe()). connect()/disconnect() additionally hold
+    // lifecycleMutex_ so reaping/spawning the worker thread is atomic even if
+    // a future caller violates the single-host-thread convention.
+    // -------------------------------------------------------------------------
+
     mutable std::mutex mutex_;
+    std::mutex lifecycleMutex_;
     std::condition_variable cv_;
     std::unique_ptr<class IxWebSocketHandle> handle_;
     std::thread worker_;
     bool workerRunning_ = false;
     bool stopRequested_ = false;
     bool connected_ = false;
+    bool sessionTerminal_ = false;
+    bool closeRequested_ = false;
+    bool pingOutstanding_ = false;
 
     std::atomic<std::int64_t> lastActivityNs_ { 0 };
-    std::atomic<bool> pingOutstanding_ { false };
 
     std::atomic<std::uint64_t> upgradeNotices_ { 0 };
     std::atomic<std::uint64_t> errorEvents_ { 0 };

@@ -39,21 +39,38 @@ OkxWebSocketSource::~OkxWebSocketSource()
 
 void OkxWebSocketSource::connect()
 {
-    bool startNeeded = false;
+    // Serializes reaping/spawning the worker against disconnect() and any
+    // concurrent connect(); mutex_ below guards the state itself.
+    const std::lock_guard lifecycleLock(lifecycleMutex_);
     {
         const std::lock_guard lock(mutex_);
-        if (!workerRunning_) {
-            workerRunning_ = true;
-            stopRequested_ = false;
-            connected_ = false;
-            pingOutstanding_ = false;
-            startNeeded = true;
+        if (workerRunning_ && !sessionTerminal_) {
+            // Physical connect is idempotent while a session is being
+            // established or is live.
+            return;
+        }
+        if (workerRunning_) {
+            // Previous session already saw its terminal event; wake the
+            // retiring worker so teardown completes here instead of racing
+            // ahead of the fresh spawn below.
+            cv_.notify_all();
         }
     }
 
-    if (!startNeeded) {
-        // Physical connect is idempotent while a session is being established.
-        return;
+    // Reap the retired worker. Safe: it exits its loop once sessionTerminal_
+    // or stopRequested_ holds, and it never blocks while holding mutex_.
+    if (worker_.joinable()) {
+        worker_.join();
+    }
+
+    {
+        const std::lock_guard lock(mutex_);
+        workerRunning_ = true;
+        stopRequested_ = false;
+        connected_ = false;
+        sessionTerminal_ = false;
+        closeRequested_ = false;
+        pingOutstanding_ = false;
     }
 
     emitState(ConnectionState::Connecting);
@@ -62,6 +79,7 @@ void OkxWebSocketSource::connect()
 
 void OkxWebSocketSource::disconnect()
 {
+    const std::lock_guard lifecycleLock(lifecycleMutex_);
     {
         std::lock_guard lock(mutex_);
         stopRequested_ = true;
@@ -127,13 +145,16 @@ void OkxWebSocketSource::handleControlEvent(const std::string& payload)
     if (payload.find("\"notice\"") != std::string::npos
         && payload.find("64008") != std::string::npos) {
         // OKX announces it will close the connection soon. Do not keep
-        // pretending the session is healthy: count the notice, drop the
-        // connection cleanly and let FeedClient's backoff reconnect.
+        // pretending the session is healthy: count the notice and flag the
+        // session for teardown. IXWebSocket::stop() joins the very callback
+        // thread this code runs on, so the actual stop() MUST be performed by
+        // the liveness worker; doing it here would self-join and terminate.
         ++upgradeNotices_;
-        const std::lock_guard lock(mutex_);
-        if (handle_) {
-            handle_->socket.stop(1000, "service upgrade");
+        {
+            const std::lock_guard lock(mutex_);
+            closeRequested_ = true;
         }
+        cv_.notify_all();
         return;
     }
 
@@ -148,6 +169,12 @@ void OkxWebSocketSource::runWorker()
     auto localHandle = std::make_unique<IxWebSocketHandle>();
     localHandle->socket.setUrl(config_.url);
 
+    // IXWebSocket silently re-handshakes on its own by default. Reconnect
+    // policy is owned exclusively by FeedClient: a dropped transport must
+    // surface as one Disconnected event and let the worker retire, never as
+    // an untracked library-internal second session.
+    localHandle->socket.disableAutomaticReconnection();
+
     if (!config_.caCertPath.empty()) {
         ix::SocketTLSOptions tlsOptions;
         tlsOptions.caFile = config_.caCertPath;
@@ -159,12 +186,12 @@ void OkxWebSocketSource::runWorker()
             switch (message->type) {
             case ix::WebSocketMessageType::Open: {
                 lastActivityNs_ = steadyNowNs();
-                pingOutstanding_ = false;
 
                 std::string subscribeMessage;
                 {
                     const std::lock_guard lock(mutex_);
                     connected_ = true;
+                    pingOutstanding_ = false;
                     subscribeMessage = "{\"op\":\"subscribe\",\"args\":[{"
                         "\"channel\":\"" + config_.channel
                         + "\",\"instId\":\"" + config_.instrument + "\"}]}";
@@ -179,6 +206,7 @@ void OkxWebSocketSource::runWorker()
 
                 const std::string& payload = message->str;
                 if (payload == "pong") {
+                    const std::lock_guard lock(mutex_);
                     pingOutstanding_ = false;
                     break;
                 }
@@ -194,10 +222,18 @@ void OkxWebSocketSource::runWorker()
 
             case ix::WebSocketMessageType::Close:
             case ix::WebSocketMessageType::Error: {
-                connected_ = false;
-                pingOutstanding_ = false;
                 // Whether a clean close or a failed handshake, the session is
                 // over; FeedClient owns what happens next (backoff reconnect).
+                // Mutate shared state under mutex_ (the liveness worker reads
+                // it there), then notify OUTSIDE the lock: state handlers may
+                // re-enter resubscribe(), which takes this same mutex.
+                {
+                    const std::lock_guard lock(mutex_);
+                    connected_ = false;
+                    pingOutstanding_ = false;
+                    sessionTerminal_ = true;
+                }
+                cv_.notify_all();
                 emitState(ConnectionState::Disconnected);
                 break;
             }
@@ -218,19 +254,24 @@ void OkxWebSocketSource::runWorker()
 
     handle_->socket.start();
 
-    // Liveness loop: application-level OKX ping/pong supervision.
+    // Liveness loop: application-level OKX ping/pong supervision. The loop
+    // ends when disconnect() is requested OR the transport reached its
+    // terminal event - a dead session has nothing left to supervise, so the
+    // worker retires and lets connect() start a fresh physical connection.
     {
         std::unique_lock lock(mutex_);
-        while (!stopRequested_) {
+        while (!stopRequested_ && !sessionTerminal_) {
             cv_.wait_for(lock, config_.livenessTick);
-            if (stopRequested_) {
+            if (stopRequested_ || sessionTerminal_ || closeRequested_) {
                 break;
             }
-            const bool isConnected = connected_;
+            if (!connected_) {
+                continue;
+            }
             const auto now = steadyNowNs();
             const auto silence = std::chrono::nanoseconds(now - lastActivityNs_.load());
 
-            if (!isConnected || silence < config_.pingInterval) {
+            if (silence < config_.pingInterval) {
                 continue;
             }
 
@@ -249,6 +290,10 @@ void OkxWebSocketSource::runWorker()
         }
     }
 
+    // Teardown runs on THIS thread only: IXWebSocket::stop() joins its
+    // internal callback thread, so it must never be invoked from a message
+    // callback. socket.stop() below may synchronously deliver the final Close
+    // callback - mutex_ is deliberately not held here.
     handle_->socket.stop();
     const std::lock_guard lock(mutex_);
     handle_.reset();

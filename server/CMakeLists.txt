@@ -103,4 +103,12 @@ if(QX_BUILD_TESTS)
     include(Sanitizers)
     qx_apply_sanitizers(api_server_test)
     add_test(NAME qx.api_server_test COMMAND api_server_test)
+
+    # Deterministic OkxWebSocketSource transport coverage: the real IXWebSocket
+    # machinery driven against an in-process loopback stub server, so Open /
+    # Message / Close / Error callbacks, the liveness worker, upgrade-notice
+    # teardown and stop()/reconnect ordering are exercised under sanitizers
+    # without any external network dependency.
+    set(QX_TEST_LINK_LIBS quantxecute_server_api quantxecute_feed_okx Threads::Threads)
+    qx_add_test(okx_source_test SRC ${CMAKE_CURRENT_SOURCE_DIR}/tests/okx_source_test.cpp)
 endif()
