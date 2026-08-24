@@ -53,7 +53,10 @@ public:
         std::uint64_t missedPongs = 0;
     };
 
-    explicit OkxWebSocketSource(Config config = {});
+    // No default argument here: GCC 12/15 reject any default-argument
+    // conversion for a parameter of nested-class type ("could not convert
+    // brace-enclosed initializer list"). Both callers build a Config anyway.
+    explicit OkxWebSocketSource(Config config);
     ~OkxWebSocketSource() override;
 
     OkxWebSocketSource(const OkxWebSocketSource&) = delete;

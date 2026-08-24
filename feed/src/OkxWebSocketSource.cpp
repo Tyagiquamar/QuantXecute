@@ -154,8 +154,6 @@ void OkxWebSocketSource::runWorker()
         localHandle->socket.setTLSOptions(tlsOptions);
     }
 
-    auto weakSourceState = [this]() { return !stopRequested_; };
-
     localHandle->socket.setOnMessageCallback(
         [this](const ix::WebSocketMessagePtr& message) {
             switch (message->type) {
