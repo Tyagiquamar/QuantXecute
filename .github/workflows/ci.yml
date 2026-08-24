@@ -52,8 +52,8 @@ jobs:
 
   # ---------------------------------------------------------------------------
   # Dashboard: unit tests, typecheck, production build.
-  # No lockfile is committed; npm install keeps the dependency set from
-  # package.json. Switching to npm ci is intentional once a lockfile lands.
+  # A committed package-lock.json pins the dependency set; npm ci fails if
+  # package.json and the lockfile ever drift apart.
   # ---------------------------------------------------------------------------
   dashboard:
     name: dashboard tests/typecheck/build
@@ -67,7 +67,7 @@ jobs:
         with:
           node-version: 22
       - name: install
-        run: npm install
+        run: npm ci --no-audit --no-fund
       - name: unit tests
         run: npm test
       - name: typecheck

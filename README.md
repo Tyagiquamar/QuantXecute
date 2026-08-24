@@ -64,7 +64,7 @@ make verify         # full gate:
                     #   2. ThreadSanitizer pass (production libs instrumented)
                     #   3. clang-tidy over core/src, feed/src, server/src
 make bench          # Release-mode benchmarks, prints p50/p95/p99 percentiles
-cd dashboard && npm install && npm test && npx tsc --noEmit
+cd dashboard && npm ci && npm test && npx tsc --noEmit
 ```
 
 GitHub Actions enforces all of it on every PR and on `main`: ASan+UBSan, TSan, clang-tidy, dashboard tests/typecheck/build, plus a Docker build-and-replay smoke test.
