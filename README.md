@@ -126,6 +126,8 @@ Compose explicitly starts in replay mode — the served book is never empty.
 
 ## Dashboard
 
+**Live on Vercel: <https://quantxecute-dashboard.vercel.app>**
+
 The Next.js console deploys standalone (e.g. Vercel) against a hosted C++ engine:
 
 ```
@@ -137,6 +139,11 @@ It shows LIVE vs REPLAY identity, exchange/instrument, book freshness,
 seq/gap/reconnect counters and integrity mode; simulations hit the hosted
 engine's current book via `POST /simulate`. When the engine is unreachable
 the dashboard says so instead of showing fake data.
+
+> Deployment status: the dashboard is live; the public engine host is not yet
+> provisioned, so until its URL is configured in the Vercel project settings
+> the dashboard will report the engine as unavailable. See
+> `docs/deployment.md` for the full engine deployment contract.
 
 ## Hosted architecture
 
