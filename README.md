@@ -2,6 +2,11 @@
 
 ![CI](https://github.com/Tyagiquamar/QuantXecute/actions/workflows/ci.yml/badge.svg)
 
+**Latest CI run: ✅ success** — all 5 gates green (ASan+UBSan, TSan,
+clang-tidy, dashboard, docker replay smoke) on
+[run 32679084693](https://github.com/Tyagiquamar/QuantXecute/actions/runs/32679084693),
+2026-08-24.
+
 Real-time market-data and **execution-simulation engine** for L2 order books, written in C++20.
 
 QuantXExecute reconstructs an exchange order book incrementally from snapshot + delta streams, simulates market-order execution against live depth with sound units (VWAP, basis points and USD), and proves a hard engineering guarantee:
