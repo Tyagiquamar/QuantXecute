@@ -112,24 +112,11 @@ jobs:
           echo "--- /book ---"
           BOOK=$(curl -fsS http://localhost:8080/book)
           echo "$BOOK"
-          # python code must start at column 0: the run block passes the
-          # -c argument through verbatim, indentation would be a syntax error
-          echo "$BOOK" | python3 -c "
-import json, sys
-book = json.load(sys.stdin)
-assert book['sequence'] > 0, f'empty sequence: {book}'
-assert len(book['bids']) > 0, 'no bids'
-assert len(book['asks']) > 0, 'no asks'
-"
+          echo "$BOOK" | python3 -c "import json,sys; b=json.load(sys.stdin); assert b['sequence'] > 0, 'empty sequence'; assert len(b['bids']) > 0, 'no bids'; assert len(b['asks']) > 0, 'no asks'"
 
           echo "--- POST /simulate ---"
           SIM=$(curl -fsS -X POST http://localhost:8080/simulate \
             -H "Content-Type: application/json" \
             -d '{"side":"buy","mode":"notional","size":25000,"feeBps":5}')
           echo "$SIM"
-          echo "$SIM" | python3 -c "
-import json, sys
-result = json.load(sys.stdin)
-assert result['filledBaseQty'] > 0, 'simulation filled nothing'
-assert result['totalCostBps'] >= 0, 'nonsensical cost'
-"
+          echo "$SIM" | python3 -c "import json,sys; r=json.load(sys.stdin); assert r['filledBaseQty'] > 0, 'simulation filled nothing'; assert r['totalCostBps'] >= 0, 'nonsensical cost'"
