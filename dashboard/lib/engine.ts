@@ -1,3 +1,4 @@
+import { connectEventSocket } from './events-socket.mjs';
 import type { BookState, EngineEvent, ExecutionResult, HealthState, Side, SizeMode } from './types';
 
 // Hosted deployments configure both URLs explicitly (Vercel env vars).
@@ -53,55 +54,32 @@ export function simulateOrder(input: SimulateInput): Promise<ExecutionResult> {
   });
 }
 
-// Subscribes to /events with automatic reconnection and exponential backoff.
-// Returns a disposer. The browser blocks mixed content automatically, but we
-// also refuse to build an insecure ws:// stream when the page itself is
-// served over HTTPS (production on Vercel).
-export function subscribeEvents(onEvent: (event: EngineEvent) => void): () => void {
+// Subscribes to /events with automatic reconnection and capped exponential
+// backoff. Returns a disposer. The browser blocks mixed content
+// automatically, but we also refuse to build an insecure ws:// stream when
+// the page itself is served over HTTPS (production on Vercel).
+export interface EventSubscriptionHandlers {
+  onEvent(event: EngineEvent): void;
+  onOpen?(): void;
+  onClose?(): void;
+  onError?(error?: unknown): void;
+  /** Fired after a close, with the upcoming retry attempt (1-based) and delay. */
+  onReconnecting?(attempt: number, delayMs: number): void;
+}
+
+export function subscribeEvents(handlers: EventSubscriptionHandlers): () => void {
   let url = `${wsBase().replace(/\/$/, '')}/events`;
   if (typeof window !== 'undefined' && window.location.protocol === 'https:'
       && url.startsWith('ws://')) {
     url = url.replace(/^ws:/, 'wss:');
   }
 
-  let socket: WebSocket | null = null;
-  let retryTimer: ReturnType<typeof setTimeout> | null = null;
-  let attempt = 0;
-  let disposed = false;
-
-  const connect = () => {
-    if (disposed) {
-      return;
-    }
-    socket = new WebSocket(url);
-    socket.onopen = () => {
-      attempt = 0;
-    };
-    socket.onmessage = (message) => {
-      try {
-        onEvent(JSON.parse(message.data as string) as EngineEvent);
-      } catch {
-        return;
-      }
-    };
-    socket.onclose = () => {
-      if (disposed) {
-        return;
-      }
-      const delay = Math.min(1000 * 2 ** attempt, 15000);
-      attempt += 1;
-      retryTimer = setTimeout(connect, delay);
-    };
-    socket.onerror = () => socket?.close();
-  };
-
-  connect();
-
-  return () => {
-    disposed = true;
-    if (retryTimer !== null) {
-      clearTimeout(retryTimer);
-    }
-    socket?.close();
-  };
+  // Reconnection policy, disposal guarantees and handler guards live in
+  // events-socket.mjs (unit-tested there); this wrapper only supplies the
+  // browser WebSocket and the production URL.
+  return connectEventSocket({
+    url,
+    webSocketFactory: (socketUrl) => new WebSocket(socketUrl),
+    handlers,
+  });
 }

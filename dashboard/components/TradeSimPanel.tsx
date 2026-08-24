@@ -9,9 +9,11 @@ import type { ExecutionResult, Side, SizeMode } from '@/lib/types';
 interface Props {
   result: ExecutionResult | null;
   onResult: (result: ExecutionResult) => void;
+  /** True only when a verified, fresh, engine-confirmed book exists. */
+  canSimulate: boolean;
 }
 
-export default function TradeSimPanel({ result, onResult }: Props) {
+export default function TradeSimPanel({ result, onResult, canSimulate }: Props) {
   const [side, setSide] = useState<Side>('buy');
   const [mode, setMode] = useState<SizeMode>('notional');
   const [size, setSize] = useState('25000');
@@ -25,7 +27,13 @@ export default function TradeSimPanel({ result, onResult }: Props) {
     try {
       onResult(await simulateOrder({ side, mode, size: Number(size), feeBps: Number(feeBps) }));
     } catch (cause) {
-      setError(String(cause));
+      // The engine refuses simulation with 503 while its book is not ready;
+      // surface that honestly instead of inventing a result.
+      setError(
+        cause instanceof Error && cause.message.includes('503')
+          ? 'engine refused simulation: book not ready (503)'
+          : String(cause),
+      );
     } finally {
       setBusy(false);
     }
@@ -66,9 +74,18 @@ export default function TradeSimPanel({ result, onResult }: Props) {
           />
         </label>
 
-        <button onClick={() => void submit()} disabled={busy}>
+        <button
+          onClick={() => void submit()}
+          disabled={busy || !canSimulate}
+          title={canSimulate ? undefined : 'waiting for a verified, fresh engine book'}
+        >
           {busy ? 'running…' : 'run simulation'}
         </button>
+        {!canSimulate && !busy ? (
+          <p style={{ color: 'var(--muted)', margin: 0 }}>
+            simulation needs a verified book — waiting for engine data
+          </p>
+        ) : null}
       </div>
 
       {error && <p style={{ color: 'var(--ask)' }}>{error}</p>}

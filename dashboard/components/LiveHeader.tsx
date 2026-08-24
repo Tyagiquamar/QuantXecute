@@ -1,18 +1,28 @@
 'use client';
 
 import { formatBps, formatPrice } from '@/lib/format.mjs';
-import type { BookState, HealthState } from '@/lib/types';
+import type { BookState, HealthState, TransportState } from '@/lib/types';
 
 interface Props {
   book: BookState | null;
   health: HealthState | null;
-  connected: boolean;
+  connectionState: TransportState;
+  restAvailable: boolean | null;
 }
 
-export default function LiveHeader({ book, health, connected }: Props) {
+const CONNECTION_BADGES: Record<TransportState, { label: string; className: string }> = {
+  connected: { label: '● engine connected', className: 'ok' },
+  connecting: { label: '◌ connecting', className: 'warn' },
+  reconnecting: { label: '◌ reconnecting', className: 'warn' },
+  unavailable: { label: '○ engine unavailable', className: 'warn' },
+};
+
+export default function LiveHeader({ book, health, connectionState, restAvailable }: Props) {
   const mode = health?.mode ?? 'unknown';
   const isLive = mode === 'live';
-  const bookUsable = (book?.sequence ?? 0) > 0 && !health?.stale && health?.bookReady;
+  const bookVerified = (book?.sequence ?? 0) > 0 && !health?.stale && health?.bookReady;
+
+  const badge = CONNECTION_BADGES[connectionState];
 
   return (
     <header className="panel" style={{ margin: 16 }}>
@@ -28,17 +38,18 @@ export default function LiveHeader({ book, health, connected }: Props) {
             {health.channel ? ` · ${health.channel}` : ''}
           </span>
         ) : null}
-        <span className={`badge ${connected ? 'ok' : 'warn'}`}>
-          {connected ? '● engine connected' : '○ engine unavailable'}
-        </span>
+        <span className={`badge ${badge.className}`}>{badge.label}</span>
+        {restAvailable === true && connectionState !== 'connected' ? (
+          <span className="badge ok">REST API ✓</span>
+        ) : null}
       </div>
       <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-        <span className="badge">mid {bookUsable ? formatPrice(book?.mid ?? NaN) : '—'}</span>
+        <span className="badge">mid {bookVerified ? formatPrice(book?.mid ?? NaN) : '—'}</span>
         <span className="badge">
-          spread {bookUsable ? formatBps(book?.spreadBps ?? NaN) : '—'}
+          spread {bookVerified ? formatBps(book?.spreadBps ?? NaN) : '—'}
         </span>
-        <span className={`badge ${bookUsable ? 'ok' : 'warn'}`}>
-          seq {bookUsable ? `✓ ${(health?.lastSeqId ?? book?.sequence)}` : '— no verified book'}
+        <span className={`badge ${bookVerified ? 'ok' : 'warn'}`}>
+          seq {bookVerified ? `✓ ${(health?.lastSeqId ?? book?.sequence)}` : '— no verified book'}
         </span>
         <span className="badge">{health ? `${health.messagesAccepted} msgs` : '—'}</span>
         {health && health.lastMessageAgeMs >= 0 ? (

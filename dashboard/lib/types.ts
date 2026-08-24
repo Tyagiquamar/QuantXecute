@@ -1,6 +1,9 @@
 export type Side = 'buy' | 'sell';
 export type SizeMode = 'notional' | 'base';
 
+// WebSocket transport lifecycle, kept independent from REST reachability.
+export type TransportState = 'connecting' | 'connected' | 'reconnecting' | 'unavailable';
+
 export interface Level {
   price: number;
   size: number;
@@ -31,6 +34,10 @@ export interface HealthState {
   messagesAccepted: number;
   lastSeqId?: number;
   lastMessageAgeMs: number;
+
+  // Explicit server-reported integrity mode, e.g. "seqId/prevSeqId".
+  // Present on REST /health; absent from WS /events payloads.
+  integrity?: string;
 }
 
 export interface ExecutionResult {

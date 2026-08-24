@@ -140,6 +140,13 @@ seq/gap/reconnect counters and integrity mode; simulations hit the hosted
 engine's current book via `POST /simulate`. When the engine is unreachable
 the dashboard says so instead of showing fake data.
 
+Data sources: depth is refreshed from `GET /book` (1 Hz polling), health
+counters from `GET /health` (independent REST fallback), and live
+sequence/engine state from the WS `/events` stream with capped-backoff
+auto-reconnect. Connection state distinguishes connecting / connected /
+reconnecting / unavailable; OKX integrity is reported as seqId/prevSeqId
+only — no checksum verification is claimed for OKX feeds.
+
 > Deployment status: the dashboard is live; the public engine host is not yet
 > provisioned, so until its URL is configured in the Vercel project settings
 > the dashboard will report the engine as unavailable. See
